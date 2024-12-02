@@ -312,7 +312,7 @@ def coreThruput(catsave=False,plotsave=False):
 
 	ax1.plot(ra_rad855,dec_rad855,marker='o',linestyle='None',color='indianred',markersize=10,label='V>10.9')
 
-	ax1.set_title('Core Throughput Standards, Heliocentric Mean Ecliptic, J2027, eq=2027',fontsize=18)
+	ax1.set_title('Core Throughput Standards, Heliocentric True Ecliptic, J2027, eq=2027',fontsize=18)
 
 	ax1.set_xlabel('l [deg]',fontsize=18)
 
@@ -383,7 +383,7 @@ def commissioningFlats(catsave=False,plotsave=False):
 
 	ax1.plot(ra_rad855,dec_rad855,marker='o',linestyle='None',color='indianred',markersize=10,label='V~8.55')
 
-	ax1.set_title('Commissioning Flats, Heliocentric Mean Ecliptic, J2027, eq=2027',fontsize=18)
+	ax1.set_title('Commissioning Flats, Heliocentric True Ecliptic, J2027, eq=2027',fontsize=18)
 
 	ax1.set_xlabel('l [deg]',fontsize=18)
 
