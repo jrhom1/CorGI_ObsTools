@@ -14,18 +14,32 @@ from astropy.coordinates import HeliocentricMeanEcliptic
 from astropy.coordinates import Galactic
 from astropy.coordinates import ICRS
 from astropy.time import Time as astroTime
+from astropy.table import vstack
 simbad = Simbad()
 simbad.add_votable_fields("pmra",
 							"pmdec",
 							"sp_type",
+							"U",
+							"B",
 							"V",
 							"G",
+							"R",
 							"I",
+							"J",
 							"H",
-							"plx",
+							"K",
+							"plx_value",
 							"rvz_radvel")
 
-def absFluxCoverage():
+def absFluxCoverage(catsave=False,plotsave=False):
+	#This function queries Simbad for the properties of faint and bright absolute flux standards. It creates a sky coverage map after applying sky motion and catalogs the properties of the objects in a csv format.
+	#Inputs:
+	#	catsave: Save the queried target properties to a csv file, Default: False
+	#	plotsave: Save the created sky coverage map as a jpg, Default: False
+	#
+	#
+	#Returns:
+	#	None
 	#Absolute flux standards are pre-defined choices.
 	dimStandards = ['2MASS J18083474+6927286',
 					'2MASS J18120957+6329423',
@@ -59,73 +73,82 @@ def absFluxCoverage():
 						'eta UMa',
 						'ksi02 Cet']
 
+	#Use astroquery's query_objects to query Simbad for dim standards
+
 	dimstars = simbad.query_objects(dimStandards)
+
+	#Add a column to the astropy data table to specify these are dim standards
+
+	dimstars['CalType'] = ['DimAbsFlux' for i in np.arange(len(dimStandards))]
 
 	epochtime = astroTime('J2027',format='jyear_str')
 	equitime = astroTime(2027.0,format='decimalyear')
 
-	#print(allstars["rvz_radvel"])
+	#Establish SkyCoord objects to apply space motion
 
 	dimics = SkyCoord(ra=dimstars['ra'],dec=dimstars['dec'],unit=(u.deg,u.deg),frame='icrs',
 		distance=1000./dimstars["plx_value"]*u.pc,pm_ra_cosdec=dimstars["pmra"],pm_dec=dimstars["pmdec"],
 		radial_velocity=dimstars["rvz_radvel"],obstime=astroTime('J2000',format='jyear_str'))
 
-	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
 
-	dimeclT = dimics.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
-	#print(eclT)
-	#print(ics.transform_to(ICRS(obstime=epochtime)))
+	dimeclT = dimics.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
 
 	newdimICS = dimics.apply_space_motion(new_obstime=epochtime)
 
-	#neweclT = eclT.apply_space_motion(new_obstime=epochtime)
+	#Transform to Heliocentric Truc Ecliptic
 
-	#print(ics)
-
-	#print(ics.transform_to(HeliocentricMeanEcliptic(equinox=equitime,obstime=epochtime)))
-
-	newdimECL = newdimICS.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+	newdimECL = newdimICS.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
 
 
 	dimra_rad = newdimECL.lon.wrap_at(180 * u.deg).radian
 	dimdec_rad = newdimECL.lat.radian
 
+	#Add in a wait so that Simbad doesn't blacklist your IP for 30 minutes
+
 	time.sleep(1.0)
+
+	#Query Simbad for Bright standards
 
 	brightstars = simbad.query_objects(brightStandards)
 
+	brightstars['CalType'] = ['BriAbsFlux' for i in np.arange(len(brightStandards))]
+
+	#Combine the dim and bright standards list into one table
+
+	combinedStandards = vstack([dimstars,brightstars])
+
+	#Save the catalog to a csv if desired
+
+	if catsave == True:
+		#Remove extraneous column
+		combinedStandards.remove_column('object_number_id')
+		df = combinedStandards.to_pandas()
+		df.to_csv('AbsoluteFluxStandards.csv')
+
 	epochtime = astroTime('J2027',format='jyear_str')
 	equitime = astroTime(2027.0,format='decimalyear')
-
-	#print(allstars["rvz_radvel"])
 
 	brightics = SkyCoord(ra=brightstars['ra'],dec=brightstars['dec'],unit=(u.deg,u.deg),frame='icrs',
 		distance=1000./brightstars["plx_value"]*u.pc,pm_ra_cosdec=brightstars["pmra"],pm_dec=brightstars["pmdec"],
 		radial_velocity=brightstars["rvz_radvel"],obstime=astroTime('J2000',format='jyear_str'))
 
-	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
-
-	brighteclT = brightics.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
-	#print(eclT)
-	#print(ics.transform_to(ICRS(obstime=epochtime)))
+	brighteclT = brightics.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
 
 	newbrightICS = brightics.apply_space_motion(new_obstime=epochtime)
 
-	#neweclT = eclT.apply_space_motion(new_obstime=epochtime)
-
-	#print(ics)
-
-	#print(ics.transform_to(HeliocentricMeanEcliptic(equinox=equitime,obstime=epochtime)))
-
-	newbrightECL = newbrightICS.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+	newbrightECL = newbrightICS.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
 
 
 	brightra_rad = newbrightECL.lon.wrap_at(180 * u.deg).radian
 	brightdec_rad = newbrightECL.lat.radian
 
+	#Make sky coverage plot
+
 	fig1,ax1 = plt.subplots(1,1,figsize=(10,6),subplot_kw={'projection': 'mollweide'})
 
 	ax1.grid(True)
+
+	#Plot CVZs
 
 
 	ax1.axhspan(np.deg2rad(54), np.deg2rad(90), alpha=0.5, color='cyan')
@@ -135,6 +158,8 @@ def absFluxCoverage():
 	ax1.plot(dimra_rad,dimdec_rad,marker='o',linestyle='None',color='indianred',markersize=10,label='Faint Standard')
 
 	ax1.plot(brightra_rad,brightdec_rad,marker='*',linestyle='None',color='goldenrod',markersize=10,label='Bright Standard')
+
+	#Label each standard's name
 
 	for i in np.arange(len(truncDim)):
 		ax1.text(dimra_rad[i],dimdec_rad[i],truncDim[i],fontweight='extra bold',horizontalalignment='center',verticalalignment='top')
@@ -150,79 +175,126 @@ def absFluxCoverage():
 
 	fig1.tight_layout()
 
-	fig1.savefig('AbsFluxStandards.jpg')
+	if plotsave == True:
+
+		fig1.savefig('AbsFluxStandards.jpg')
 
 	plt.show()
 
 def queryTap_byVmag(Vmag,cone=0.1):
-	example_base = """SELECT TOP 50 oid, main_id, ra, dec, pmra, pmdec, plx_value, rvz_radvel, otype, V, otypes
+	#Return a TAP query that satisfies the criteria of being within a certain range of a V magnitude.
+	#Inputs:
+	#	Vmag - Target V magnitude you want to query
+	#	cone - Range around Vmag that is acceptable for the query. Default = 0.1
+	#Returns:
+	#	The astropy table of the query result
+	example_base = """SELECT TOP 50 oid, main_id, ra, dec, coo_err_maj, coo_err_min, coo_err_angle, pmra, pmdec, plx_value, rvz_radvel, otype, otypes, sp_type, U, B, V, G, R, I, J, H, K
 						FROM basic JOIN allfluxes ON basic.oid = allfluxes.oidref JOIN alltypes ON basic.oid = alltypes.oidref
 						WHERE (otype = '*') AND (otype != 'V*..') AND (otype != '**..') AND (V <= {VmagUp}) AND (V >= {VmagDown})
 						AND (otypes) NOT LIKE ('%V*%')
 						AND (otypes) NOT LIKE ('%**%')
   						AND ra IS NOT NULL
   						AND dec IS NOT NULL
-  						ORDER BY V;"""
+  						AND plx_value IS NOT NULL
+						AND pmra IS NOT NULL
+						AND pmdec IS NOT NULL
+						AND rvz_radvel IS NOT NULL
+  						;"""
 	example = example_base.format(VmagUp=str(Vmag+cone),VmagDown=str(Vmag-cone))
 
 	queryresult = simbad.query_tap(example)
 
-	print(queryresult["V"])
+	return queryresult
+
+def queryTap_byname(name):
+	#Return a TAP query of a single object.
+	#Inputs:
+	#	Name - Valid Simbad ID of an object
+	#Returns:
+	#	The astropy table of the query result
+	example_base = """SELECT TOP 1 oid, main_id, ra, dec, coo_err_maj, coo_err_min, coo_err_angle, pmra, pmdec, plx_value, rvz_radvel, otypes, V, G
+						FROM basic JOIN alltypes ON basic.oid = alltypes.oidref JOIN allfluxes ON basic.oid = allfluxes.oidref JOIN ident ON basic.oid = ident.oidref
+						WHERE id = '{insertname}'
+  						AND ra IS NOT NULL
+  						AND dec IS NOT NULL;"""
+	example = example_base.format(insertname=name)
+
+	queryresult = simbad.query_tap(example)
 
 	return queryresult
 
 def queryTap_byVmagAsym(VmagLow,VmagHigh):
-	example_base = """SELECT TOP 50 oid, main_id, ra, dec, pmra, pmdec, plx_value, rvz_radvel, otype, V, otypes
+	#Return a TAP query that satisfies the criteria of being within a certain range of V magnitudes.
+	#Inputs:
+	#	VmagLow - Lower bound of possible target V mag
+	#	VmagHigh - Upper bound of possible target V mag
+	#Returns:
+	#	The astropy table of the query result
+	example_base = """SELECT TOP 50 oid, main_id, ra, dec, coo_err_maj, coo_err_min, coo_err_angle, pmra, pmdec, plx_value, rvz_radvel, otype, otypes, sp_type, U, B, V, G, R, I, J, H, K
 						FROM basic JOIN allfluxes ON basic.oid = allfluxes.oidref JOIN alltypes ON basic.oid = alltypes.oidref
 						WHERE (otype = '*') AND (otype != 'V*..') AND (otype != '**..') AND (V <= {VmagUp}) AND (V >= {VmagDown})
 						AND (otypes) NOT LIKE ('%V*%')
 						AND (otypes) NOT LIKE ('%**%')
   						AND ra IS NOT NULL
   						AND dec IS NOT NULL
-  						ORDER BY V;"""
+  						AND plx_value IS NOT NULL
+						AND pmra IS NOT NULL
+						AND pmdec IS NOT NULL
+						AND rvz_radvel IS NOT NULL
+  						;"""
 	example = example_base.format(VmagUp=str(VmagHigh),VmagDown=str(VmagLow))
 
 	queryresult = simbad.query_tap(example)
 
-	print(queryresult["V"])
-
 	return queryresult
 
-def coreThruput():
+def coreThruput(catsave=False,plotsave=False):
+	#This function queries Simbad for the properties of core throughput calibration targets. It creates a sky coverage map after applying sky motion and catalogs the properties of the objects in a csv format.
+	#Inputs:
+	#	catsave: Save the queried target properties to a csv file, Default: False
+	#	plotsave: Save the created sky coverage map as a jpg, Default: False
+	#
+	#
+	#Returns:
+	#	None
+
+	#Roman-Coronagraph core throughput standards cannot use the ND filter. Therefore, they must be fainter than V=10.9 or else they will saturate. An upper bound of 12 is set to restrict the range of possible targets.
 	mag855 = queryTap_byVmagAsym(10.9,12.0)
 
-	mag855["plx_value"] = mag855["plx_value"].filled(0.00001)
-	mag855["pmra"] = mag855["pmra"].filled(0.0)
-	mag855["pmdec"] = mag855["pmdec"].filled(0.0)
-	mag855["rvz_radvel"] = mag855["rvz_radvel"].filled(0.0)
+	#Fill in missing values necessary for Sky motion. The assumption here is that missing values are essentially minimal.
+
+	#mag855["plx_value"] = mag855["plx_value"].filled(0.00001)
+	#mag855["pmra"] = mag855["pmra"].filled(0.0)
+	#mag855["pmdec"] = mag855["pmdec"].filled(0.0)
+	#mag855["rvz_radvel"] = mag855["rvz_radvel"].filled(0.0)
 
 	mag855Dist = 1000./mag855["plx_value"].value
-	print(len(mag855Dist))
 
 	epochtime = astroTime('J2027',format='jyear_str')
 	equitime = astroTime(2027.0,format='decimalyear')
 
-	#print(allstars["rvz_radvel"])
+	mag855['CalType'] = ['CoreThruput' for i in np.arange(50)]
+
+	#Save to csv if desired
+
+	if catsave == True:
+		df = mag855.to_pandas()
+		df.to_csv('CoreThruputTargs.csv')
+
+
+	#Establish SkyCoord objects
 
 	ics855 = SkyCoord(ra=mag855['ra'],dec=mag855['dec'],unit=(u.deg,u.deg),frame='icrs',
 		distance=mag855Dist*u.pc,pm_ra_cosdec=mag855["pmra"],pm_dec=mag855["pmdec"],
 		radial_velocity=mag855["rvz_radvel"],obstime=astroTime('J2000',format='jyear_str'))
 
-	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
-
-	eclT855 = ics855.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
-	#print(eclT)
-	#print(ics.transform_to(ICRS(obstime=epochtime)))
+	eclT855 = ics855.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
 
 	newICS855 = ics855.apply_space_motion(new_obstime=epochtime)
 
-	#neweclT = eclT.apply_space_motion(new_obstime=epochtime)
+	#Transform to Heliocentric True Ecliptic
 
-	#print(ics)
-
-	#print(ics.transform_to(HeliocentricMeanEcliptic(equinox=equitime,obstime=epochtime)))
-
-	newECL855 = newICS855.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+	newECL855 = newICS855.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
 
 
 	ra_rad855 = newECL855.lon.wrap_at(180 * u.deg).radian
@@ -231,6 +303,8 @@ def coreThruput():
 	fig1,ax1 = plt.subplots(1,1,figsize=(12,6),subplot_kw={'projection': 'mollweide'})
 
 	ax1.grid(True)
+
+	#Plot CVZs
 
 	ax1.axhspan(np.deg2rad(54), np.deg2rad(90), alpha=0.5, color='cyan')
 
@@ -248,45 +322,52 @@ def coreThruput():
 
 	fig1.tight_layout()
 
-	fig1.savefig('CoreThruputStandards.jpg')
+	if plotsave == True:
+
+		fig1.savefig('CoreThruputStandards.jpg')
 
 	plt.show()
 
-def commissioningFlats():
+def commissioningFlats(catsave=False,plotsave=False):
+	#This function queries Simbad for the properties of commissioning flat calibration targets. It creates a sky coverage map after applying sky motion and catalogs the properties of the objects in a csv format.
+	#Inputs:
+	#	catsave: Save the queried target properties to a csv file, Default: False
+	#	plotsave: Save the created sky coverage map as a jpg, Default: False
+	#
+	#
+	#Returns:
+	#	None
 	mag855 = queryTap_byVmag(8.55,cone=0.05)
 
-	mag855["plx_value"] = mag855["plx_value"].filled(0.00001)
-	mag855["pmra"] = mag855["pmra"].filled(0.0)
-	mag855["pmdec"] = mag855["pmdec"].filled(0.0)
-	mag855["rvz_radvel"] = mag855["rvz_radvel"].filled(0.0)
+	#mag855["plx_value"] = mag855["plx_value"].filled(0.00001)
+	#mag855["pmra"] = mag855["pmra"].filled(0.0)
+	#mag855["pmdec"] = mag855["pmdec"].filled(0.0)
+	#mag855["rvz_radvel"] = mag855["rvz_radvel"].filled(0.0)
 
 	mag855Dist = 1000./mag855["plx_value"].value
-	print(len(mag855Dist))
+
+	mag855['CalType'] = ['CommFlat' for i in np.arange(50)]
+
+	#Save to csv if desired
+
+	if catsave == True:
+		df = mag855.to_pandas()
+		df.to_csv('CommissioningFlats.csv')
 
 	epochtime = astroTime('J2027',format='jyear_str')
 	equitime = astroTime(2027.0,format='decimalyear')
-
-	#print(allstars["rvz_radvel"])
 
 	ics855 = SkyCoord(ra=mag855['ra'],dec=mag855['dec'],unit=(u.deg,u.deg),frame='icrs',
 		distance=mag855Dist*u.pc,pm_ra_cosdec=mag855["pmra"],pm_dec=mag855["pmdec"],
 		radial_velocity=mag855["rvz_radvel"],obstime=astroTime('J2000',format='jyear_str'))
 
-	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
-
-	eclT855 = ics855.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
-	#print(eclT)
-	#print(ics.transform_to(ICRS(obstime=epochtime)))
+	eclT855 = ics855.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
 
 	newICS855 = ics855.apply_space_motion(new_obstime=epochtime)
 
-	#neweclT = eclT.apply_space_motion(new_obstime=epochtime)
+	#Transform to Heliocentric True Ecliptic
 
-	#print(ics)
-
-	#print(ics.transform_to(HeliocentricMeanEcliptic(equinox=equitime,obstime=epochtime)))
-
-	newECL855 = newICS855.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+	newECL855 = newICS855.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
 
 
 	ra_rad855 = newECL855.lon.wrap_at(180 * u.deg).radian
@@ -312,11 +393,84 @@ def commissioningFlats():
 
 	fig1.tight_layout()
 
-	fig1.savefig('CommissioningFlatStandards.jpg')
+	if plotsave == True:
+
+		fig1.savefig('CommissioningFlatStandards.jpg')
 
 	plt.show()
 
-def imageCorrections():
+def imageCorrections(catsave=False,plotsave=False):
+	#This function queries Simbad for the properties of image correction calibration targets. It creates a sky coverage map after applying sky motion and catalogs the properties of the objects in a csv format.
+	#Inputs:
+	#	catsave: Save the queried target properties to a csv file, Default: False
+	#	plotsave: Save the created sky coverage map as a jpg, Default: False
+	#
+	#
+	#Returns:
+	#	None
+
+	magList = np.array([5.5,8.5,11.5,13.5]) #Array of V magnitudes that we want to query
+	markers_arr = ['o','^','*','x'] #Plot markers for the sky map
+	markers_col = ['indianred','goldenrod','navy','magenta'] #Marker colors for plotted points
+	#Setting up the plot
+	fig1,ax1 = plt.subplots(1,1,figsize=(12,6),subplot_kw={'projection': 'mollweide'}) #This creates a Mollweide projection map
+	ax1.grid(True) #Grid lines
+	ax1.axhspan(np.deg2rad(54), np.deg2rad(90), alpha=0.5, color='cyan') #Plot out CVZs as a shaded region
+	ax1.axhspan(np.deg2rad(-90), np.deg2rad(-54), alpha=0.5, color='cyan')
+	ax1.set_title('Image Corrections, Heliocentric True Ecliptic, J2027, eq=2027',fontsize=18) #Set a plot title
+	ax1.set_xlabel('l [deg]',fontsize=18) #Set axes labels
+	ax1.set_ylabel('b [deg]',fontsize=18)
+	epochtime = astroTime('J2027',format='jyear_str') #Define epoch and equinox times for the ecliptic transformation
+	equitime = astroTime(2027.0,format='decimalyear')
+	for i in np.arange(len(magList)):
+		mag = queryTap_byVmag(magList[i],cone=0.05)
+    	#The following lines fill any missing values in your table query with the numbers in parentheses
+    	#mag["plx_value"] = mag["plx_value"].filled(0.00001)
+    	#mag["pmra"] = mag["pmra"].filled(0.0)
+    	#mag["pmdec"] = mag["pmdec"].filled(0.0)
+    	#mag["rvz_radvel"] = mag["rvz_radvel"].filled(0.0)
+		magDist = 1000./mag["plx_value"].value #Calculate the system distance in pc
+		ics = SkyCoord(ra=mag['ra'],dec=mag['dec'],unit=(u.deg,u.deg),frame='icrs',
+		distance=magDist*u.pc,pm_ra_cosdec=mag["pmra"],pm_dec=mag["pmdec"],
+		radial_velocity=mag["rvz_radvel"],obstime=astroTime('J2000',format='jyear_str')) #Set up a SkyCoord object. Requires the values from Simbad Query.
+
+		mag['CalType'] = ['ImagCorr_'+str(magList[i]) for j in np.arange(50)]
+
+		if i == 0:
+			fullTable = mag
+		else:
+			fullTable = vstack([fullTable,mag])
+
+		newICS = ics.apply_space_motion(new_obstime=epochtime) #Apply proper and radial motion to the new observing time of 2027
+
+		newECL = newICS.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str'))) #Transform your proper motion applied ICRS coordinates to ecliptic coordinates
+
+		ra_rad = newECL.lon.wrap_at(180 * u.deg).radian #Express your ecliptic coordinates (longitude and latitude) in radians for plotting, allow it to wrap around the projection to the other side
+		dec_rad = newECL.lat.radian
+
+    	#Plot your result
+		ax1.plot(ra_rad,dec_rad,marker=markers_arr[i],linestyle='None',color=markers_col[i],markersize=10,label='V~'+str(magList[i]))
+
+		time.sleep(5) #I put this step in because if you make too many simbad queries in a given time interval, your IP gets blocked for a period of time. So every time you complete a query, wait 5 seconds before starting the next one.
+		print('Completed Mag '+str(magList[i]))
+
+	#Save catalog if desired
+	if catsave == True:
+		df = fullTable.to_pandas()
+		df.to_csv('ImageCorrections.csv')
+
+	#Create a plot legend
+	ax1.legend(bbox_to_anchor=(1.2,0),loc='lower right',fontsize=16)
+	fig1.tight_layout() #Clean it up
+
+	#Save plot if desired
+	if plotsave == True:
+		fig1.savefig('ImageCorrectStandards.jpg')
+
+	plt.show()
+
+
+def imageCorrections_old():
 	#4 sets of targets. V = 5.5, 8.5, 11.5, and 13.5 +/- 0.5 mag. Ideally they are close together.
 
 	magList = np.array([5.5,8.5,11.5,13.5])
@@ -342,7 +496,7 @@ def imageCorrections():
 
 	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
 
-	eclT55 = ics55.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
+	eclT55 = ics55.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
 	#print(eclT)
 	#print(ics.transform_to(ICRS(obstime=epochtime)))
 
@@ -354,7 +508,7 @@ def imageCorrections():
 
 	#print(ics.transform_to(HeliocentricMeanEcliptic(equinox=equitime,obstime=epochtime)))
 
-	newECL55 = newICS55.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+	newECL55 = newICS55.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
 
 
 	ra_rad55 = newECL55.lon.wrap_at(180 * u.deg).radian
@@ -383,7 +537,7 @@ def imageCorrections():
 
 	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
 
-	eclT85 = ics85.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
+	eclT85 = ics85.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
 	#print(eclT)
 	#print(ics.transform_to(ICRS(obstime=epochtime)))
 
@@ -395,7 +549,7 @@ def imageCorrections():
 
 	#print(ics.transform_to(HeliocentricMeanEcliptic(equinox=equitime,obstime=epochtime)))
 
-	newECL85 = newICS85.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+	newECL85 = newICS85.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
 
 
 	ra_rad85 = newECL85.lon.wrap_at(180 * u.deg).radian
@@ -424,7 +578,7 @@ def imageCorrections():
 
 	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
 
-	eclT115 = ics115.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
+	eclT115 = ics115.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
 	#print(eclT)
 	#print(ics.transform_to(ICRS(obstime=epochtime)))
 
@@ -436,7 +590,7 @@ def imageCorrections():
 
 	#print(ics.transform_to(HeliocentricMeanEcliptic(equinox=equitime,obstime=epochtime)))
 
-	newECL115 = newICS115.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+	newECL115 = newICS115.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
 
 
 	ra_rad115 = newECL115.lon.wrap_at(180 * u.deg).radian
@@ -465,7 +619,7 @@ def imageCorrections():
 
 	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
 
-	eclT135 = ics135.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
+	eclT135 = ics135.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
 	#print(eclT)
 	#print(ics.transform_to(ICRS(obstime=epochtime)))
 
@@ -477,7 +631,7 @@ def imageCorrections():
 
 	#print(ics.transform_to(HeliocentricMeanEcliptic(equinox=equitime,obstime=epochtime)))
 
-	newECL135 = newICS135.transform_to(HeliocentricMeanEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+	newECL135 = newICS135.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
 
 
 	ra_rad135 = newECL135.lon.wrap_at(180 * u.deg).radian
