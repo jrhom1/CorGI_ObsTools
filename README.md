@@ -7,7 +7,18 @@ Create sky coverage maps
 
 Query downloaded catalogs
 
-#Current Plan
+# Requirements
+Astropy >= 6.0
+
+Astroquery >= 0.4.8
+
+matplotlib >= 3.9
+
+numpy >= 2.1
+
+pandas >= 2.0
+
+# Current Plan
 
 Python code that can query Simbad and VizieR to identify and catalog Roman-Coronagraph calibration targets
 
