@@ -15,6 +15,8 @@ from astropy.coordinates import Galactic
 from astropy.coordinates import ICRS
 from astropy.time import Time as astroTime
 from astropy.table import vstack
+from astroquery.xmatch import XMatch
+from astropy.table import Table
 simbad = Simbad()
 simbad.add_votable_fields("pmra",
 							"pmdec",
@@ -666,6 +668,13 @@ def imageCorrections_old():
 	fig1.savefig('ImageCorrectStandards.jpg')
 
 	plt.show()
+
+def GaiaXMatchFilter():
+	#Note: angDist keyword is the separation
+	input_targetlist = 'CoreThruputTargs.csv'
+	input_table = Table.read(input_targetlist)
+	table_xmatch = XMatch.query(cat1=input_table,cat2='vizier:I/355/gaiadr3',max_distance=1*u.arcsec,colRA1='ra',colDec1='dec')
+	print(table_xmatch[np.where(table_xmatch['angDist']<=0.5)])
 
 
 
