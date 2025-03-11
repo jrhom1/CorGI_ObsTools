@@ -13,6 +13,7 @@ from astropy.coordinates import HeliocentricTrueEcliptic
 from astropy.coordinates import HeliocentricMeanEcliptic
 from astropy.coordinates import Galactic
 from astropy.coordinates import ICRS
+from astropy.coordinates import GeocentricTrueEcliptic
 from astropy.time import Time as astroTime
 from astropy.table import vstack
 simbad = Simbad()
@@ -174,7 +175,8 @@ def simplePlot2():
 
 	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
 
-	eclT = ics.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
+	#eclT = ics.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
+	eclT = ics.transform_to(GeocentricTrueEcliptic(equinox=astroTime(2000.0,format='decimalyear')))
 	#print(eclT)
 	#print(ics.transform_to(ICRS(obstime=epochtime)))
 
@@ -186,7 +188,9 @@ def simplePlot2():
 
 	#print(ics.transform_to(HeliocentricTrueEcliptic(equinox=equitime,obstime=epochtime)))
 
-	newECL = newICS.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+	#newECL = newICS.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+
+	newECL = newICS.transform_to(GeocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
 
 
 	ra_rad = newECL.lon.wrap_at(180 * u.deg).radian
@@ -215,7 +219,7 @@ def simplePlot2():
 	ax1.grid(True)
 
 	#for i in np.arange(len(fixnames[:42])):
-	for i in np.arange(len(fixnames)):
+	for i in np.arange(len(fixnames[:41])):
 		if PSFstatus[i] == 'good':
 			PSFcol = 'lime'
 			PSFmark = 's'
@@ -235,12 +239,17 @@ def simplePlot2():
 
 		if PSFstatus[i] != 'bad':
 			ax1.plot(ra_rad[i],dec_rad[i],marker=PSFmark,linestyle='None',color=PSFcol,markersize=10,markeredgecolor="black")
+			if fixnames[i] == '* eta Cen' or fixnames[i] == '* alf Lep' or fixnames[i] == '* bet Eri' or fixnames[i] == '* del Leo' or fixnames[i] == '* eps UMa' or fixnames[i] == '* eps CMa':
+				ax1.text(ra_rad[i]-np.deg2rad(3),dec_rad[i],fixnames[i],fontweight='extra bold',horizontalalignment='right',verticalalignment='top')
+			else:
+				ax1.text(ra_rad[i]+np.deg2rad(3),dec_rad[i],fixnames[i],fontweight='extra bold',horizontalalignment='left',verticalalignment='top')
 
 	ax1.axhspan(np.deg2rad(54), np.deg2rad(90), alpha=0.5, color='cyan')
 
 	ax1.axhspan(np.deg2rad(-90), np.deg2rad(-54), alpha=0.5, color='cyan')
 
-	ax1.legend(handles=legend_elements1,loc=4,fontsize=16)
+	#ax1.legend(handles=legend_elements1,loc=4,fontsize=16)#,bbox_to_anchor=(1.0, 0.0, 1., 0.1))
+	ax1.legend(handles=legend_elements1,fontsize=16,bbox_to_anchor=(1.0, 1.0),bbox_transform=fig1.transFigure)
 
 	#ax1.set_title('Current Reference Stars',fontsize=18)
 
@@ -255,7 +264,7 @@ def simplePlot2():
 
 	#fig1.savefig('ReferenceStarsVD_v2.jpg')
 
-	fig1.savefig('RefStar_Prop.pdf')
+	fig1.savefig('RefStar_Prop_Named.jpg')
 
 	plt.show()
 
