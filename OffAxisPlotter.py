@@ -11,6 +11,14 @@ plt.rcParams['xtick.labelsize']=15
 plt.rcParams['ytick.labelsize']=15
 
 def offaxisPSF(save=False):
+    '''
+	offaxisPSF: Creates a plot that shows the unocculted HLC PSF profile compared to relative 10^-7 and 10^-8 contrast dark hole levels.
+	Inputs:
+		save: Default: False. Boolean for whether or not to save the figure.
+    Returns:
+        None
+
+	'''
 	hlc_profile = 'HLC_prof.csv'
 	#hlc_profile = fits.getdata('')
 	separation = np.loadtxt(hlc_profile,usecols=0,delimiter=',')
@@ -41,6 +49,8 @@ def offaxisPSF_Demo(primarymag=0,comp_sep=0,comp_mag=0,save=False):
 		comp_sep: Default: 0. Off-axis component separation in arcseconds.
 		comp_mag: Default: 0. Off-axis component apparent V magnitude.
 		save: Default: False. Boolean for whether or not to save the figure.
+    Returns:
+        None
 
 	'''
 
