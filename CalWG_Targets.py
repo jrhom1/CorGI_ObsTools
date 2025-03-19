@@ -917,6 +917,7 @@ def CatalogBuild(filebase):
 			try:
 				jsdc = query_JSDC('* '+names[i],hdexample.replace(" ",""))
 				time.sleep(1)
+				print('JSDC Query Successful')
 			except:
 				time.sleep(1)
 			#jsdc = Table(names=('Name','Vmag','LDD','e_LDD','LDDCHI','UDDB','UDDV','UDDR','UDDI','UDDJ','UDDH','UDDK'),
@@ -925,6 +926,7 @@ def CatalogBuild(filebase):
 				jsdc = Table([NameMask])
 
 			if jsdc['Name'].mask == False:
+				print('Adding in JSDC')
 				for diam in np.arange(len(DiameterKeys)):
 					if jsdc[DiameterKeys[diam]].mask == False:
 						Simbadresult[DiameterKeys[diam]] = jsdc[DiameterKeys[diam]]
@@ -1341,6 +1343,129 @@ def addPrebuiltColumn2New(prebuiltTable,newTable,rowIndex,columnName="P% (U)"):
 	newTable[columnName] = prebuiltTable[columnName].values[rowIndex]
 
 	return newTable
+
+def plotStandards_Saved(filebase,plotsave=False):
+	filename = filebase+'_EXCAMv2.csv'
+	fullcatalog = pandas.read_csv(filename)
+
+	EXCAMPASS = fullcatalog['EXCAM_PASS'].values
+	DR3_RUWE = fullcatalog['RUWE_2016'].values[np.where(EXCAMPASS==True)]
+	CalType = fullcatalog['CalType'].values[np.where(EXCAMPASS==True)]
+
+	RAs = fullcatalog['ra'].values[np.where(EXCAMPASS==True)]
+	Decs = fullcatalog['dec'].values[np.where(EXCAMPASS==True)]
+	PMRA = fullcatalog['pmra'].values[np.where(EXCAMPASS==True)]
+	PMDec = fullcatalog['pmdec'].values[np.where(EXCAMPASS==True)]
+	rvz_radvel = fullcatalog['rvz_radvel'].values[np.where(EXCAMPASS==True)]
+	distances = 1000./fullcatalog['plx_value'].values[np.where(EXCAMPASS==True)]
+
+
+	Names = fullcatalog['main_id'].values[np.where(EXCAMPASS==True)]
+
+	ICS = SkyCoord(ra=RAs,dec=Decs,unit=(u.deg,u.deg),frame='icrs',
+		distance=distances*u.pc,pm_ra_cosdec=PMRA*u.mas/u.yr,pm_dec=PMDec*u.mas/u.yr,
+		radial_velocity=rvz_radvel*u.km/u.s,obstime=astroTime('J2000',format='jyear_str'))
+
+	epochtime = astroTime('J2027',format='jyear_str')
+	equitime = astroTime(2027.0,format='decimalyear')
+
+	newICS = ICS.apply_space_motion(new_obstime=epochtime)
+
+	newECL = newICS.transform_to(HeliocentricTrueEcliptic(equinox=astroTime(2027.0,format='decimalyear'),obstime=astroTime('J2027',format='jyear_str')))
+
+	CVZ_targs = []
+
+	for i in np.arange(len(RAs)):
+		if DR3_RUWE[i] < 1.4:
+			if newECL.lat[i] > 54.0*u.deg or newECL.lat[i] < -54.0*u.deg:
+				CVZ_targs.append(Names[i])
+
+	print('CVZ Targets after RUWE Filtering: '+str(len(CVZ_targs))+' Stars')
+	print(CVZ_targs)
+
+	ra_rad = newECL.lon.wrap_at(180 * u.deg).radian
+	dec_rad = newECL.lat.radian
+
+	fig1,ax1 = plt.subplots(1,1,figsize=(10,6),subplot_kw={'projection': 'mollweide'})
+
+	ax1.grid(True)
+
+	if 'ImagCorr' in CalType[0]:
+		magList = ['4.0-4.5','7.5','9.7','11.8'] #Array of V magnitudes that we want to query
+		markers_arr = ['o','^','*','x'] #Plot markers for the sky map
+		markers_col = ['indianred','goldenrod','navy','magenta'] #Marker colors for plotted points
+		counters41 = 0
+		counters75 = 0
+		counters97 = 0
+		counters118 = 0
+		for i in np.arange(len(ra_rad)):
+			if '4.1' in CalType[i]:
+				indi = 0
+			elif '7.5' in CalType[i]:
+				indi = 1
+			elif '9.7' in CalType[i]:
+				indi = 2
+			elif '11.8' in CalType[i]:
+				indi = 3
+			if DR3_RUWE[i] < 1.4:
+				ax1.plot(ra_rad[i],dec_rad[i],marker=markers_arr[indi],linestyle='None',color=markers_col[indi],markersize=10,label='V~'+magList[indi])
+				if indi == 0:
+					counters41+=1
+				elif indi == 1:
+					counters75+=1
+				elif indi == 2:
+					counters97+=1
+				elif indi == 3:
+					counters118+=1
+
+		legend_elements = [Line2D([0], [0], marker='o', color='w', label='4.0-4.5',
+                          markerfacecolor='indianred', markersize=15,linestyle='None'),
+                   Line2D([0], [0], marker='^', color='w', label='7.5',
+                          markerfacecolor='goldenrod', markersize=15,linestyle='None'),
+                   Line2D([0], [0], marker='*', color='w', label='9.7',
+                          markerfacecolor='navy', markersize=15,linestyle='None'),
+                   Line2D([0], [0], marker='x', color='magenta', label='11.8',
+                          markerfacecolor='magenta', markersize=15,linestyle='None')]
+
+
+		ax1.legend(handles=legend_elements,bbox_to_anchor=(1.2,0),loc='lower right',fontsize=16)
+		print('Image Corrections Candidates After EXCAM and RUWE Filtering')
+		print('V=4-4.5: ',counters41)
+		print('V=7.5: ',counters75)
+		print('V=9.7: ',counters97)
+		print('V=11.8: ',counters118)
+	else:
+		counters = 0
+		for i in np.arange(len(ra_rad)):
+			if DR3_RUWE[i] < 1.4:
+				ax1.plot(ra_rad[i],dec_rad[i],marker='o',linestyle='None',color='navy',markersize=10)
+				counters+=1
+		print(filebase+' Candidates After EXCAM and RUWE Filtering')
+		print(counters)
+
+
+
+	ax1.axhspan(np.deg2rad(54), np.deg2rad(90), alpha=0.5, color='cyan')
+
+	ax1.axhspan(np.deg2rad(-90), np.deg2rad(-54), alpha=0.5, color='cyan')
+
+	ax1.set_title(filebase,fontsize=18)
+
+	#ax1.set_title('Unpolarized Standards, Heliocentric True Ecliptic, J2027, eq=2027',fontsize=18)
+
+	ax1.set_xlabel('l [deg]',fontsize=18)
+
+	ax1.set_ylabel('b [deg]',fontsize=18)
+
+	#ax1.legend(bbox_to_anchor=(1.2,0),loc='lower right',fontsize=16)
+	fig1.tight_layout() #Clean it up
+	if plotsave == True:
+		fig1.savefig(filebase+'_Coverage.jpg')
+	plt.show()
+
+
+
+	
 
 
 
