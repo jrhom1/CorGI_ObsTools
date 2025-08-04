@@ -11,14 +11,14 @@ plt.rcParams['xtick.labelsize']=15
 plt.rcParams['ytick.labelsize']=15
 
 def offaxisPSF(save=False):
-    '''
-	offaxisPSF: Creates a plot that shows the unocculted HLC PSF profile compared to relative 10^-7 and 10^-8 contrast dark hole levels.
-	Inputs:
-		save: Default: False. Boolean for whether or not to save the figure.
-    Returns:
-        None
+    #'''
+	#offaxisPSF: Creates a plot that shows the unocculted HLC PSF profile compared to relative 10^-7 and 10^-8 contrast dark hole levels.
+	#Inputs:
+	#	save: Default: False. Boolean for whether or not to save the figure.
+    #Returns:
+    #    None
 
-	'''
+	#'''
 	hlc_profile = 'HLC_prof.csv'
 	#hlc_profile = fits.getdata('')
 	separation = np.loadtxt(hlc_profile,usecols=0,delimiter=',')
@@ -41,19 +41,18 @@ def offaxisPSF(save=False):
 	if save == True:
 		fig1.savefig('HLC_PSFprof.pdf')
 
-def offaxisPSF_Demo(primarymag=0,comp_sep=0,comp_mag=0,save=False):
+def offaxisPSF_Demo(primarymag=0,comp_sep=0,comp_delta_mag=0,save=False):
 	'''
 	offaxisPSF_Demo: Creates a plot that shows how much flux the PSF profile of an off-axis companion can introduce into the dark hole of a given primary star magnitude.
 	Inputs:
 		primarymag: Default: 0. Primary component apparent V magnitude.
 		comp_sep: Default: 0. Off-axis component separation in arcseconds.
-		comp_mag: Default: 0. Off-axis component apparent V magnitude.
+		comp_delta_mag: Default: 0. Off-axis component apparent V magnitude.
 		save: Default: False. Boolean for whether or not to save the figure.
     Returns:
         None
 
 	'''
-
 	hlc_profile = 'HLC_prof.csv'
 	#hlc_profile = fits.getdata('')
 	separation = np.loadtxt(hlc_profile,usecols=0,delimiter=',')
@@ -81,7 +80,7 @@ def offaxisPSF_Demo(primarymag=0,comp_sep=0,comp_mag=0,save=False):
 
 	fig1,ax1 = plt.subplots(1,1,figsize=(8,6))
 
-	ax1.plot(fullseps+comp_sep,-2.5*np.log10(fullcontrast)+comp_mag,label='Unocculted PSF Profile',color='navy')
+	ax1.plot(fullseps+comp_sep,-2.5*np.log10(fullcontrast)+comp_delta_mag+primarymag,label='Unocculted PSF Profile',color='navy')
 	ax1.plot(fullseps,np.ones_like(fullcontrast)*(primarymag+17.5),linestyle='--',label=r'10$^{-7}$ Contrast',color='k')
 	ax1.plot(fullseps,np.ones_like(fullcontrast)*(primarymag+20.0),linestyle='-.',label=r'10$^{-8}$ Contrast',color='k')
 	if comp_sep>0:
@@ -109,13 +108,13 @@ def offaxisPSF_Demo(primarymag=0,comp_sep=0,comp_mag=0,save=False):
 	#ax1.set_xlim([7e-3,1e2])
 	ax1.set_xlim([-10,10])
 	ax1.set_ylim([25+primarymag,primarymag])
-	ax1.set_title(r'Ref. Star $V$='+str(primarymag)+r', Comp. $V$='+str(comp_mag)+', Sep = '+str(comp_sep)+' arcsec',fontsize=18)
+	ax1.set_title(r'Ref. Star $V$='+str(primarymag)+r', Comp. $\Delta V$='+str(comp_delta_mag)+', Sep = '+str(comp_sep)+' arcsec',fontsize=18)
 	#ax1.legend(handles=legend_elements1,fontsize=14,bbox_to_anchor=(1.0,0.8))
 	ax1.legend(handles=legend_elements1,fontsize=14,loc=1)
 	ax1.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2g'))
 	fig1.tight_layout()
 	if save==True:
-		fig1.savefig('OffAxis_HostV'+str(primarymag)+'_CompV'+str(comp_mag)+'_Sep'+str(comp_sep)+'.jpg')
+		fig1.savefig('OffAxis_HostV'+str(primarymag)+'_CompDeltaV'+str(comp_delta_mag)+'_Sep'+str(comp_sep)+'.jpg')
 	plt.show()
 
 
